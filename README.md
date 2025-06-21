@@ -20,7 +20,7 @@ gh extension install HikaruEgashira/gh-ws
 ```bash
 $ gh ws --help
 Usage:
-  gh ws               ... Generate workspace and open in VSCode
+  gh ws               ... Create/open workspace from current repository worktrees in VSCode
   gh ws init          ... Generate workspace from git worktrees
   gh ws init <name>   ... Generate workspace with custom name
   gh ws init --multi  ... Generate workspace from multiple repositories

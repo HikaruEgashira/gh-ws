@@ -50,7 +50,7 @@ create_workspace() {
 
 if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "Usage:"
-    echo "  gh ws               ... Generate workspace and open in VSCode"
+    echo "  gh ws               ... Create/open workspace from current repository worktrees in VSCode"
     echo "  gh ws init          ... Generate workspace from git worktrees"
     echo "  gh ws init <name>   ... Generate workspace with custom name"
     echo "  gh ws init --multi  ... Generate workspace from multiple repositories"
