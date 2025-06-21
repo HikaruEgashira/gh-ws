@@ -95,5 +95,10 @@ while IFS= read -r folder; do
     fi
 done <<< "$folders"
 
+# Add any additional arguments passed to this script
+if [ $# -gt 0 ]; then
+    claude_cmd="$claude_cmd $*"
+fi
+
 echo "Executing: $claude_cmd" >&2
 eval "$claude_cmd"
