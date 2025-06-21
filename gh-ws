@@ -86,7 +86,10 @@ elif [ "$1" == "init" ]; then
         fi
         
         # Read worktrees into array
-        mapfile -t worktrees < "$temp_file"
+        worktrees=()
+        while IFS= read -r line; do
+            worktrees+=("$line")
+        done < "$temp_file"
         rm "$temp_file"
         
         # Create workspace
@@ -124,7 +127,10 @@ elif [ "$1" == "clean" ]; then
         fi
         
         # Read worktrees into array
-        mapfile -t worktrees < "$temp_file"
+        worktrees=()
+        while IFS= read -r line; do
+            worktrees+=("$line")
+        done < "$temp_file"
         rm "$temp_file"
         
         # Update workspace
