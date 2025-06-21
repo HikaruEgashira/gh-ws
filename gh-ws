@@ -56,6 +56,7 @@ if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "  gh ws init --multi  ... Generate workspace from multiple repositories"
     echo "  gh ws init <name> --multi ... Generate multi-repository workspace with custom name"
     echo "  gh ws list          ... List existing workspaces"
+    echo "  gh ws edit          ... Edit workspace file in EDITOR"
     echo "  gh ws remove        ... Remove workspace (interactive selection)"
     echo "  gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory"
     echo "  gh ws <command>     ... Search via fzf and run <command> with selected workspace as argument"
@@ -187,6 +188,37 @@ elif [ "$1" == "init" ]; then
             echo "Error: Not in a git repository"
             exit 1
         fi
+    fi
+
+# gh ws edit
+elif [ "$1" == "edit" ]; then
+    workspace_dir="$HOME/ghq/workspaces"
+    if [ -d "$workspace_dir" ]; then
+        temp_file=$(mktemp)
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                echo "$workspace" >> "$temp_file"
+            fi
+        done 2>/dev/null || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No workspaces found"
+            rm "$temp_file"
+            exit 0
+        fi
+        
+        selected_workspace=$(cat "$temp_file" | fzf --prompt="Select workspace to edit: " || true)
+        rm "$temp_file"
+        
+        if [ -n "$selected_workspace" ]; then
+            # Use EDITOR if set, otherwise fallback to vi
+            editor="${EDITOR:-vi}"
+            echo "Opening workspace file in $editor: $selected_workspace"
+            "$editor" "$selected_workspace"
+        fi
+    else
+        echo "No workspaces directory found"
+        exit 1
     fi
 
 # gh ws remove
