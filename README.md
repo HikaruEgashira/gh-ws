@@ -27,6 +27,7 @@ Usage:
   gh ws list          ... List existing workspaces
   gh ws edit          ... Edit workspace file in EDITOR
   gh ws remove        ... Remove workspace (interactive selection)
+  gh ws sync          ... Sync workspace with current git worktree state
   gh ws claude        ... Run Claude with current workspace folders or select workspace
   gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory
   gh ws <command>     ... Search via fzf and run <command> with selected workspace as argument
@@ -55,6 +56,9 @@ gh ws edit
 
 # Remove workspace
 gh ws remove
+
+# Sync workspace with current worktree state
+gh ws sync
 
 # Open workspace in VS Code
 gh ws code
