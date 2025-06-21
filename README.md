@@ -32,46 +32,63 @@ Usage:
   gh ws <command>     ... Search via fzf and run <command> with selected workspace as argument
 ```
 
-### Basic Usage
+### Examples
 
 ```bash
-# 1. Create workspace from current repository and open VSCode
+# Generate workspace from current repository worktrees and open in VSCode
 gh ws
 
-# 2. Create workspace from multiple repositories
+# Create workspace file only (no VSCode launch)
+gh ws init
+
+# Create workspace with custom name
+gh ws init my-workspace
+
+# Create multi-repository workspace (interactive selection)
 gh ws init --multi
 
-# 3. Open existing workspace
+# Create named multi-repository workspace
+gh ws init frontend --multi
+
+# List all existing workspaces
+gh ws list
+
+# Edit workspace file in your preferred editor
+gh ws edit
+
+# Remove workspace (interactive selection)
+gh ws remove
+
+# Open workspace in VS Code (path as argument)
 gh ws code
+
+# Run commands in the selected workspace directory
+gh ws -- ls
+gh ws -- git status
 ```
 
-## User Stories
+## Command Execution Modes
 
-**Single Repository Development**
-```bash
-cd ~/ghq/github.com/user/my-app
-gh wt add feature/auth        # Create worktree for feature
-gh ws                         # Create workspace with all worktrees & open VSCode
-```
+There are two ways to execute commands with selected workspaces:
 
-**Multi-Repository Project**
-```bash
-gh ws init frontend --multi   # Select related repos: frontend, backend, docs
-                             # Creates workspace with all repos + their worktrees
-```
+1. **`gh ws <command>`** - Passes the workspace path as an argument to the command
+   - Example: `gh ws code` → executes `code /path/to/selected/workspace.code-workspace`
+   - Useful for editors and tools that accept workspace files as arguments
 
-**Daily Workflow**
-```bash
-gh ws list                   # See all workspaces
-gh ws code                   # Quick open workspace in VSCode
-gh ws edit                   # Customize workspace settings
-```
+2. **`gh ws -- <command>`** - Changes to the workspace directory and executes the command
+   - Example: `gh ws -- ls` → changes to workspace directory then runs `ls`
+   - Useful for commands that need to run within the workspace directory
 
 ## Requirements
 
 - [GitHub CLI](https://cli.github.com/)
 - [fzf](https://github.com/junegunn/fzf)
 - [VSCode](https://code.visualstudio.com/) with `code` command in PATH
+- Must be used within a git repository (for single-repo workspaces)
+
+## How it works
+
+`gh ws` creates VSCode workspace files in `~/ghq/workspaces/` directory. For single-repository workspaces, it detects git worktrees in the current repository. For multi-repository workspaces, it allows selection of multiple repositories from the entire `~/ghq` directory structure and automatically includes their worktrees.
 
 ## Integration with other gh extensions
 
