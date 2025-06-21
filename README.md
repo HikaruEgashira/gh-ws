@@ -20,7 +20,6 @@ gh extension install HikaruEgashira/gh-ws
 ```bash
 $ gh ws --help
 Usage:
-  gh ws               ... Create/open workspace from current repository worktrees in VSCode
   gh ws init          ... Generate workspace from git worktrees
   gh ws init <name>   ... Generate workspace with custom name
   gh ws init --multi  ... Generate workspace from multiple repositories
@@ -36,16 +35,13 @@ Usage:
 ### Examples
 
 ```bash
-# Generate workspace from current repository worktrees and open in VSCode
-gh ws
-
-# Create workspace file only (no VSCode launch)
+# Create workspace file only
 gh ws init
 
 # Create workspace with custom name
 gh ws init my-workspace
 
-# Create multi-repository workspace (interactive selection)
+# Create multi-repository workspace
 gh ws init --multi
 
 # Create named multi-repository workspace
@@ -57,36 +53,15 @@ gh ws list
 # Edit workspace file in your preferred editor
 gh ws edit
 
-# Remove workspace (interactive selection)
+# Remove workspace
 gh ws remove
 
-# Open workspace in VS Code (path as argument)
+# Open workspace in VS Code
 gh ws code
-
-# Run commands in the selected workspace directory
-gh ws -- ls
-gh ws -- git status
 
 # Run Claude Code with workspace folders
 gh ws claude
 ```
-
-## Command Execution Modes
-
-There are two ways to execute commands with selected workspaces:
-
-1. **`gh ws <command>`** - Passes the workspace path as an argument to the command
-   - Example: `gh ws code` → executes `code /path/to/selected/workspace.code-workspace`
-   - Useful for editors and tools that accept workspace files as arguments
-
-2. **`gh ws -- <command>`** - Changes to the workspace directory and executes the command
-   - Example: `gh ws -- ls` → changes to workspace directory then runs `ls`
-   - Useful for commands that need to run within the workspace directory
-
-3. **`gh ws claude`** - Runs Claude Code with workspace folders
-   - Example: `gh ws claude` → executes `claude --add-dir "/path/folder1" --add-dir "/path/folder2"`
-   - Automatically finds workspace file in current directory or prompts for selection
-   - Extracts all folder paths from the workspace and passes them to Claude
 
 ## Requirements
 
