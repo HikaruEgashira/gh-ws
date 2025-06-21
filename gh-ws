@@ -54,6 +54,7 @@ if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "  gh ws init          ... Generate workspace from git worktrees"
     echo "  gh ws init <name>   ... Generate workspace with custom name"
     echo "  gh ws init --multi  ... Generate workspace from multiple repositories"
+    echo "  gh ws init <name> --multi ... Generate multi-repository workspace with custom name"
     echo "  gh ws list          ... List existing workspaces"
     echo "  gh ws remove        ... Remove workspace (interactive selection)"
     echo "  gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory"
@@ -76,8 +77,8 @@ elif [ "$1" == "list" ]; then
 
 # gh ws init
 elif [ "$1" == "init" ]; then
-    # gh ws init --multi - create workspace from multiple repositories
-    if [ "$2" == "--multi" ]; then
+    # gh ws init --multi OR gh ws init <name> --multi - create workspace from multiple repositories
+    if [ "$2" == "--multi" ] || [ "$3" == "--multi" ]; then
         echo "Select repositories to include in workspace:"
         
         # Find all repositories under ~/ghq
@@ -111,10 +112,16 @@ elif [ "$1" == "init" ]; then
         rm "$temp_selected"
         
         # Get workspace name
-        echo "Enter workspace name:"
-        read -r workspace_name
-        if [ -z "$workspace_name" ]; then
-            workspace_name="multi-repo-workspace"
+        if [ "$2" != "--multi" ] && [ -n "$2" ]; then
+            # gh ws init <name> --multi
+            workspace_name="$2"
+        else
+            # gh ws init --multi
+            echo "Enter workspace name:"
+            read -r workspace_name
+            if [ -z "$workspace_name" ]; then
+                workspace_name="multi-repo-workspace"
+            fi
         fi
         
         # Create workspace
