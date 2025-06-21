@@ -47,8 +47,8 @@ gh ws clean
 ## Integration with other gh extensions
 
 Works well with:
-- `gh-q`: Quick repository navigation
-- `gh-wt`: Git worktree management
+- [`gh-q`](https://github.com/HikaruEgashira/gh-q): Quick repository navigation
+- [`gh-wt`](https://github.com/HikaruEgashira/gh-wt): Git worktree management
 
 ```bash
 # Example workflow
