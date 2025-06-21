@@ -99,13 +99,16 @@ elif [ "$1" == "init" ]; then
             exit 0
         fi
         
-        # Convert selected repos to array
+        # Convert selected repos to array using mapfile alternative
         worktrees=()
+        temp_selected=$(mktemp)
+        echo "$selected_repos" > "$temp_selected"
         while IFS= read -r line; do
             if [ -n "$line" ]; then
                 worktrees+=("$line")
             fi
-        done <<< "$selected_repos"
+        done < "$temp_selected"
+        rm "$temp_selected"
         
         # Get workspace name
         echo "Enter workspace name:"
