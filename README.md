@@ -45,19 +45,6 @@ gh ws init --multi
 gh ws code
 ```
 
-### All Commands
-
-```bash
-gh ws                     # Create & open workspace
-gh ws init                # Create workspace file only
-gh ws init <name>         # Create with custom name
-gh ws init --multi        # Multi-repository workspace
-gh ws list                # List workspaces
-gh ws edit                # Edit workspace file
-gh ws remove              # Remove workspace
-gh ws code                # Open workspace in VSCode
-```
-
 ## User Stories
 
 **Single Repository Development**
