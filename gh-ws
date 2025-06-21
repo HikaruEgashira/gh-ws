@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+set -e
+
+# Function to find the git repository root
+get_current_repo() {
+    local current_dir="$(pwd)"
+    local ghq_root="$HOME/ghq/github.com"
+    
+    # Check if current directory is under ghq
+    if [[ "$current_dir" == "$ghq_root"* ]]; then
+        # Extract repo path (remove ghq_root prefix and get first 2 path components)
+        local relative_path="${current_dir#$ghq_root/}"
+        local repo_path=$(echo "$relative_path" | cut -d'/' -f1-2)
+        echo "$ghq_root/$repo_path"
+    fi
+}
+
+# Function to get repository name for workspace filename
+get_repo_name() {
+    local repo_path="$1"
+    basename "$repo_path"
+}
+
+# Function to get workspace path
+get_workspace_path() {
+    local repo_name="$1"
+    local workspace_dir="$HOME/ghq/workspaces"
+    mkdir -p "$workspace_dir"
+    echo "$workspace_dir/$repo_name.code-workspace"
+}
+
+# Function to create workspace JSON
+create_workspace() {
+    local worktrees=("$@")
+    local workspace_json='{"folders":['
+    local first=true
+    
+    for worktree in "${worktrees[@]}"; do
+        if [ "$first" = true ]; then
+            first=false
+        else
+            workspace_json+=','
+        fi
+        workspace_json+="{\"path\":\"$worktree\"}"
+    done
+    
+    workspace_json+=']}'
+    echo "$workspace_json"
+}
+
+if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    echo "Usage:"
+    echo "  gh ws               ... Generate workspace and open in VSCode"
+    echo "  gh ws init          ... Generate workspace from git worktrees"
+    echo "  gh ws list          ... List existing workspaces"
+    echo "  gh ws clean         ... Remove deleted worktrees from workspace"
+    exit 0
+
+# gh ws list
+elif [ "$1" == "list" ]; then
+    workspace_dir="$HOME/ghq/workspaces"
+    if [ -d "$workspace_dir" ]; then
+        echo "Available workspaces:"
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                basename "$workspace" .code-workspace
+            fi
+        done 2>/dev/null || echo "No workspaces found"
+    else
+        echo "No workspaces directory found"
+    fi
+
+# gh ws init
+elif [ "$1" == "init" ]; then
+    if current_repo=$(get_current_repo); then
+        echo "Using current repository: $current_repo"
+        
+        # Get worktrees
+        temp_file=$(mktemp)
+        (cd "$current_repo" && git worktree list --porcelain 2>/dev/null | grep "^worktree " | sed 's/^worktree //' >> "$temp_file") || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No worktrees found"
+            rm "$temp_file"
+            exit 0
+        fi
+        
+        # Read worktrees into array
+        mapfile -t worktrees < "$temp_file"
+        rm "$temp_file"
+        
+        # Create workspace
+        repo_name=$(get_repo_name "$current_repo")
+        workspace_path=$(get_workspace_path "$repo_name")
+        workspace_json=$(create_workspace "${worktrees[@]}")
+        
+        echo "$workspace_json" > "$workspace_path"
+        echo "Workspace created: $workspace_path"
+        
+        # Open VSCode
+        if command -v code >/dev/null 2>&1; then
+            code "$workspace_path"
+        else
+            echo "VSCode (code command) not found. Please install VSCode or add it to PATH."
+        fi
+    else
+        echo "Error: Not in a git repository"
+        exit 1
+    fi
+
+# gh ws clean
+elif [ "$1" == "clean" ]; then
+    if current_repo=$(get_current_repo); then
+        echo "Cleaning workspace for: $current_repo"
+        
+        # Get current worktrees
+        temp_file=$(mktemp)
+        (cd "$current_repo" && git worktree list --porcelain 2>/dev/null | grep "^worktree " | sed 's/^worktree //' >> "$temp_file") || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No worktrees found"
+            rm "$temp_file"
+            exit 0
+        fi
+        
+        # Read worktrees into array
+        mapfile -t worktrees < "$temp_file"
+        rm "$temp_file"
+        
+        # Update workspace
+        repo_name=$(get_repo_name "$current_repo")
+        workspace_path=$(get_workspace_path "$repo_name")
+        workspace_json=$(create_workspace "${worktrees[@]}")
+        
+        echo "$workspace_json" > "$workspace_path"
+        echo "Workspace cleaned: $workspace_path"
+    else
+        echo "Error: Not in a git repository"
+        exit 1
+    fi
+
+# gh ws (default: init and open)
+else
+    if current_repo=$(get_current_repo); then
+        repo_name=$(get_repo_name "$current_repo")
+        workspace_path=$(get_workspace_path "$repo_name")
+        
+        # Check if workspace exists
+        if [ -f "$workspace_path" ]; then
+            echo "Opening existing workspace: $workspace_path"
+        else
+            echo "Creating new workspace for: $current_repo"
+            
+            # Get worktrees
+            temp_file=$(mktemp)
+            (cd "$current_repo" && git worktree list --porcelain 2>/dev/null | grep "^worktree " | sed 's/^worktree //' >> "$temp_file") || true
+            
+            if [ ! -s "$temp_file" ]; then
+                echo "No worktrees found"
+                rm "$temp_file"
+                exit 0
+            fi
+            
+            # Read worktrees into array
+            mapfile -t worktrees < "$temp_file"
+            rm "$temp_file"
+            
+            # Create workspace
+            workspace_json=$(create_workspace "${worktrees[@]}")
+            echo "$workspace_json" > "$workspace_path"
+            echo "Workspace created: $workspace_path"
+        fi
+        
+        # Open VSCode
+        if command -v code >/dev/null 2>&1; then
+            code "$workspace_path"
+        else
+            echo "VSCode (code command) not found. Please install VSCode or add it to PATH."
+        fi
+    else
+        echo "Error: Not in a git repository"
+        exit 1
+    fi
+fi
