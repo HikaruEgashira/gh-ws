@@ -8,11 +8,23 @@ GitHub CLI extension for managing VSCode workspaces with git worktrees.
 gh extension install HikaruEgashira/gh-ws
 ```
 
+## Requirements
+
+- [GitHub CLI](https://cli.github.com/)
+- [fzf](https://github.com/junegunn/fzf) (for interactive selection in related tools)
+- [VSCode](https://code.visualstudio.com/) with `code` command in PATH
+- Must be used within a git repository
+
 ## Usage
+
+### Generate workspace and open in VSCode
+```bash
+gh ws               # Create workspace and open in VSCode
+```
 
 ### Generate workspace from git worktrees
 ```bash
-gh ws init
+gh ws init          # Create workspace file only
 ```
 
 ### List existing workspaces
@@ -23,11 +35,6 @@ gh ws list
 ### Clean workspace (remove deleted worktrees)
 ```bash
 gh ws clean
-```
-
-### Open workspace
-```bash
-gh ws
 ```
 
 ## Features
