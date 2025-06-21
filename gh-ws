@@ -58,6 +58,7 @@ if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "  gh ws list          ... List existing workspaces"
     echo "  gh ws edit          ... Edit workspace file in EDITOR"
     echo "  gh ws remove        ... Remove workspace (interactive selection)"
+    echo "  gh ws claude        ... Run Claude with current workspace folders or select workspace"
     echo "  gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory"
     echo "  gh ws <command>     ... Search via fzf and run <command> with selected workspace as argument"
     exit 0
@@ -281,6 +282,11 @@ elif [ "$1" == "--" ]; then
         echo "No workspaces directory found"
         exit 1
     fi
+
+# gh ws claude
+elif [ "$1" == "claude" ]; then
+    shift  # Remove "claude" from arguments
+    exec "$(dirname "$0")/gh-ws-claude" "$@"
 
 # gh ws <command>
 elif [ "$1" != "init" ] && [ "$1" != "list" ] && [ "$1" != "remove" ] && [ "$1" != "rm" ]; then

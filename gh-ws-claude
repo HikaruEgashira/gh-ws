@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -e
+
+# Function to find workspace files in current directory
+find_workspace_in_current_dir() {
+    find . -maxdepth 1 -name "*.code-workspace" -type f 2>/dev/null
+}
+
+# Function to parse workspace file and extract folder paths
+parse_workspace_folders() {
+    local workspace_file="$1"
+    if [ -f "$workspace_file" ]; then
+        # Use jq to parse JSON and extract folder paths
+        if command -v jq >/dev/null 2>&1; then
+            jq -r '.folders[]?.path // empty' "$workspace_file" 2>/dev/null
+        else
+            # Fallback: simple grep-based extraction
+            grep -o '"path":"[^"]*"' "$workspace_file" 2>/dev/null | cut -d'"' -f4
+        fi
+    fi
+}
+
+# Function to select workspace interactively
+select_workspace() {
+    local workspace_dir="$HOME/ghq/workspaces"
+    if [ -d "$workspace_dir" ]; then
+        local temp_file=$(mktemp)
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                echo "$workspace" >> "$temp_file"
+            fi
+        done 2>/dev/null || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No workspaces found" >&2
+            rm "$temp_file"
+            return 1
+        fi
+        
+        local selected_workspace=$(cat "$temp_file" | fzf --prompt="Select workspace: " || true)
+        rm "$temp_file"
+        
+        if [ -n "$selected_workspace" ]; then
+            echo "$selected_workspace"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    echo "Usage:"
+    echo "  gh ws claude                ... Run Claude with current workspace folders or select workspace"
+    exit 0
+fi
+
+# Find workspace in current directory first
+workspace_file=""
+workspace_files=$(find_workspace_in_current_dir)
+
+if [ -n "$workspace_files" ]; then
+    # If multiple workspace files found, use the first one
+    workspace_file=$(echo "$workspace_files" | head -n1)
+    echo "Using workspace file in current directory: $workspace_file" >&2
+else
+    # No workspace in current directory, select from global workspaces
+    echo "No workspace file found in current directory." >&2
+    echo "Selecting from global workspaces..." >&2
+    
+    if workspace_file=$(select_workspace); then
+        echo "Selected workspace: $workspace_file" >&2
+        # Change to ~/ghq directory to make paths relative to ghq root
+        cd ~/ghq
+    else
+        echo "No workspace selected or available" >&2
+        exit 1
+    fi
+fi
+
+# Parse workspace and get folder paths
+folders=$(parse_workspace_folders "$workspace_file")
+
+if [ -z "$folders" ]; then
+    echo "No folders found in workspace file" >&2
+    exit 1
+fi
+
+# Build claude command
+claude_cmd="claude"
+
+# Add folders with --add-dir
+while IFS= read -r folder; do
+    if [ -n "$folder" ] && [ -d "$folder" ]; then
+        claude_cmd="$claude_cmd --add-dir \"$folder\""
+    fi
+done <<< "$folders"
+
+echo "Executing: $claude_cmd" >&2
+eval "$claude_cmd"
