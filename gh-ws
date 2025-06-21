@@ -53,6 +53,7 @@ if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "  gh ws               ... Generate workspace and open in VSCode"
     echo "  gh ws init          ... Generate workspace from git worktrees"
     echo "  gh ws init <name>   ... Generate workspace with custom name"
+    echo "  gh ws init --multi  ... Generate workspace from multiple repositories"
     echo "  gh ws list          ... List existing workspaces"
     echo "  gh ws remove        ... Remove workspace (interactive selection)"
     echo "  gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory"
@@ -75,40 +76,92 @@ elif [ "$1" == "list" ]; then
 
 # gh ws init
 elif [ "$1" == "init" ]; then
-    if current_repo=$(get_current_repo); then
-        echo "Using current repository: $current_repo"
+    # gh ws init --multi - create workspace from multiple repositories
+    if [ "$2" == "--multi" ]; then
+        echo "Select repositories to include in workspace:"
         
-        # Get worktrees
+        # Find all repositories under ~/ghq
         temp_file=$(mktemp)
-        (cd "$current_repo" && git worktree list --porcelain 2>/dev/null | grep "^worktree " | sed 's/^worktree //' >> "$temp_file") || true
+        find ~/ghq -maxdepth 3 -mindepth 3 -type d -not -path '*/\.*' -not -path '*/.git/worktrees*' > "$temp_file"
         
         if [ ! -s "$temp_file" ]; then
-            echo "No worktrees found"
+            echo "No repositories found"
             rm "$temp_file"
             exit 0
         fi
         
-        # Read worktrees into array
-        worktrees=()
-        while IFS= read -r line; do
-            worktrees+=("$line")
-        done < "$temp_file"
+        # Use fzf with multi-select to choose repositories
+        selected_repos=$(cat "$temp_file" | fzf --multi --prompt="Select repositories (Tab to select multiple): " || true)
         rm "$temp_file"
         
-        # Create workspace with custom name if provided
-        if [ -n "$2" ]; then
-            workspace_name="$2"
-        else
-            workspace_name=$(get_repo_name "$current_repo")
+        if [ -z "$selected_repos" ]; then
+            echo "No repositories selected"
+            exit 0
         fi
+        
+        # Convert selected repos to array
+        worktrees=()
+        while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                worktrees+=("$line")
+            fi
+        done <<< "$selected_repos"
+        
+        # Get workspace name
+        echo "Enter workspace name:"
+        read -r workspace_name
+        if [ -z "$workspace_name" ]; then
+            workspace_name="multi-repo-workspace"
+        fi
+        
+        # Create workspace
         workspace_path=$(get_workspace_path "$workspace_name")
         workspace_json=$(create_workspace "${worktrees[@]}")
         
         echo "$workspace_json" > "$workspace_path"
-        echo "Workspace created: $workspace_path"
+        echo "Multi-repository workspace created: $workspace_path"
+        echo "Repositories included:"
+        for repo in "${worktrees[@]}"; do
+            echo "  - $repo"
+        done
+        
+    # gh ws init [name] - create workspace from current repo worktrees
     else
-        echo "Error: Not in a git repository"
-        exit 1
+        if current_repo=$(get_current_repo); then
+            echo "Using current repository: $current_repo"
+            
+            # Get worktrees
+            temp_file=$(mktemp)
+            (cd "$current_repo" && git worktree list --porcelain 2>/dev/null | grep "^worktree " | sed 's/^worktree //' >> "$temp_file") || true
+            
+            if [ ! -s "$temp_file" ]; then
+                echo "No worktrees found"
+                rm "$temp_file"
+                exit 0
+            fi
+            
+            # Read worktrees into array
+            worktrees=()
+            while IFS= read -r line; do
+                worktrees+=("$line")
+            done < "$temp_file"
+            rm "$temp_file"
+            
+            # Create workspace with custom name if provided
+            if [ -n "$2" ]; then
+                workspace_name="$2"
+            else
+                workspace_name=$(get_repo_name "$current_repo")
+            fi
+            workspace_path=$(get_workspace_path "$workspace_name")
+            workspace_json=$(create_workspace "${worktrees[@]}")
+            
+            echo "$workspace_json" > "$workspace_path"
+            echo "Workspace created: $workspace_path"
+        else
+            echo "Error: Not in a git repository"
+            exit 1
+        fi
     fi
 
 # gh ws remove
