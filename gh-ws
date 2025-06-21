@@ -58,6 +58,7 @@ if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "  gh ws list          ... List existing workspaces"
     echo "  gh ws edit          ... Edit workspace file in EDITOR"
     echo "  gh ws remove        ... Remove workspace (interactive selection)"
+    echo "  gh ws sync          ... Sync workspace with current git worktree state"
     echo "  gh ws claude        ... Run Claude with current workspace folders or select workspace"
     echo "  gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory"
     echo "  gh ws <command>     ... Search via fzf and run <command> with selected workspace as argument"
@@ -283,13 +284,105 @@ elif [ "$1" == "--" ]; then
         exit 1
     fi
 
+# gh ws sync
+elif [ "$1" == "sync" ]; then
+    workspace_dir="$HOME/ghq/workspaces"
+    if [ -d "$workspace_dir" ]; then
+        temp_file=$(mktemp)
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                echo "$workspace" >> "$temp_file"
+            fi
+        done 2>/dev/null || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No workspaces found"
+            rm "$temp_file"
+            exit 0
+        fi
+        
+        selected_workspace=$(cat "$temp_file" | fzf --prompt="Select workspace to sync: " || true)
+        rm "$temp_file"
+        
+        if [ -n "$selected_workspace" ]; then
+            echo "Syncing workspace: $selected_workspace"
+            
+            # Parse existing workspace to get folders
+            existing_folders=$(grep -o '"path":"[^"]*"' "$selected_workspace" 2>/dev/null | cut -d'"' -f4 || true)
+            
+            # Find all unique git repositories from the folders
+            repos=()
+            temp_repos=$(mktemp)
+            while IFS= read -r folder; do
+                if [ -n "$folder" ] && [ -d "$folder" ]; then
+                    # Find git repository root for this folder
+                    repo_root=$(cd "$folder" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null || true)
+                    if [ -n "$repo_root" ]; then
+                        echo "$repo_root" >> "$temp_repos"
+                    fi
+                fi
+            done <<< "$existing_folders"
+            
+            # Get unique repositories
+            if [ -s "$temp_repos" ]; then
+                sort -u "$temp_repos" > "${temp_repos}.unique"
+                mv "${temp_repos}.unique" "$temp_repos"
+            fi
+            
+            # Collect all worktrees from all repositories
+            new_worktrees=()
+            while IFS= read -r repo; do
+                if [ -n "$repo" ] && [ -d "$repo" ]; then
+                    echo "Checking repository: $repo"
+                    temp_worktrees=$(mktemp)
+                    (cd "$repo" && git worktree list --porcelain 2>/dev/null | grep "^worktree " | sed 's/^worktree //' >> "$temp_worktrees") || true
+                    
+                    while IFS= read -r wt_path; do
+                        if [ -n "$wt_path" ]; then
+                            new_worktrees+=("$wt_path")
+                        fi
+                    done < "$temp_worktrees"
+                    rm "$temp_worktrees"
+                fi
+            done < "$temp_repos"
+            rm "$temp_repos"
+            
+            # Create updated workspace JSON
+            workspace_json='{"folders":['
+            first=true
+            
+            for worktree in "${new_worktrees[@]}"; do
+                if [ "$first" = true ]; then
+                    first=false
+                else
+                    workspace_json+=','
+                fi
+                workspace_json+="{\"path\":\"$worktree\"}"
+            done
+            
+            workspace_json+=']}'
+            
+            # Save updated workspace
+            echo "$workspace_json" > "$selected_workspace"
+            
+            echo "Workspace synced successfully!"
+            echo "Updated folders:"
+            for folder in "${new_worktrees[@]}"; do
+                echo "  - $folder"
+            done
+        fi
+    else
+        echo "No workspaces directory found"
+        exit 1
+    fi
+
 # gh ws claude
 elif [ "$1" == "claude" ]; then
     shift  # Remove "claude" from arguments
     exec "$(dirname "$0")/gh-ws-claude" "$@"
 
 # gh ws <command>
-elif [ "$1" != "init" ] && [ "$1" != "list" ] && [ "$1" != "remove" ] && [ "$1" != "rm" ]; then
+elif [ "$1" != "init" ] && [ "$1" != "list" ] && [ "$1" != "remove" ] && [ "$1" != "rm" ] && [ "$1" != "sync" ]; then
     workspace_dir="$HOME/ghq/workspaces"
     if [ -d "$workspace_dir" ]; then
         temp_file=$(mktemp)
