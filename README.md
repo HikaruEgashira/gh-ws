@@ -7,7 +7,7 @@
 🔹<a  href="https://github.com/HikaruEgashira/gh-ws/issues">Request Feature</a>
 </h3>
 
-VSCode workspace management extension for GitHub CLI.
+VSCode workspace management and Claude Code integration extension for GitHub CLI.
 
 ## Installation
 
