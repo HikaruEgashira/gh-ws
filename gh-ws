@@ -53,7 +53,9 @@ if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "  gh ws               ... Generate workspace and open in VSCode"
     echo "  gh ws init          ... Generate workspace from git worktrees"
     echo "  gh ws list          ... List existing workspaces"
-    echo "  gh ws clean         ... Remove deleted worktrees from workspace"
+    echo "  gh ws remove        ... Remove workspace (interactive selection)"
+    echo "  gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory"
+    echo "  gh ws <command>     ... Search via fzf and run <command> with selected workspace as argument"
     exit 0
 
 # gh ws list
@@ -99,49 +101,97 @@ elif [ "$1" == "init" ]; then
         
         echo "$workspace_json" > "$workspace_path"
         echo "Workspace created: $workspace_path"
-        
-        # Open VSCode
-        if command -v code >/dev/null 2>&1; then
-            code "$workspace_path"
-        else
-            echo "VSCode (code command) not found. Please install VSCode or add it to PATH."
-        fi
     else
         echo "Error: Not in a git repository"
         exit 1
     fi
 
-# gh ws clean
-elif [ "$1" == "clean" ]; then
-    if current_repo=$(get_current_repo); then
-        echo "Cleaning workspace for: $current_repo"
-        
-        # Get current worktrees
+# gh ws remove
+elif [ "$1" == "remove" ] || [ "$1" == "rm" ]; then
+    workspace_dir="$HOME/ghq/workspaces"
+    if [ -d "$workspace_dir" ]; then
         temp_file=$(mktemp)
-        (cd "$current_repo" && git worktree list --porcelain 2>/dev/null | grep "^worktree " | sed 's/^worktree //' >> "$temp_file") || true
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                echo "$workspace" >> "$temp_file"
+            fi
+        done 2>/dev/null || true
         
         if [ ! -s "$temp_file" ]; then
-            echo "No worktrees found"
+            echo "No workspaces found"
             rm "$temp_file"
             exit 0
         fi
         
-        # Read worktrees into array
-        worktrees=()
-        while IFS= read -r line; do
-            worktrees+=("$line")
-        done < "$temp_file"
+        selected_workspace=$(cat "$temp_file" | fzf --prompt="Select workspace to remove: " || true)
         rm "$temp_file"
         
-        # Update workspace
-        repo_name=$(get_repo_name "$current_repo")
-        workspace_path=$(get_workspace_path "$repo_name")
-        workspace_json=$(create_workspace "${worktrees[@]}")
-        
-        echo "$workspace_json" > "$workspace_path"
-        echo "Workspace cleaned: $workspace_path"
+        if [ -n "$selected_workspace" ]; then
+            echo "Removing workspace: $selected_workspace"
+            rm "$selected_workspace"
+            echo "Workspace removed successfully!"
+        fi
     else
-        echo "Error: Not in a git repository"
+        echo "No workspaces directory found"
+        exit 1
+    fi
+
+# gh ws -- <command>
+elif [ "$1" == "--" ]; then
+    shift  # Remove the "--" from arguments
+    workspace_dir="$HOME/ghq/workspaces"
+    if [ -d "$workspace_dir" ]; then
+        temp_file=$(mktemp)
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                echo "$workspace" >> "$temp_file"
+            fi
+        done 2>/dev/null || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No workspaces found"
+            rm "$temp_file"
+            exit 0
+        fi
+        
+        selected_workspace=$(cat "$temp_file" | fzf --prompt="Select workspace: " || true)
+        rm "$temp_file"
+        
+        if [ -n "$selected_workspace" ]; then
+            workspace_dir=$(dirname "$selected_workspace")
+            cd "$workspace_dir"
+            exec "$@"
+        fi
+    else
+        echo "No workspaces directory found"
+        exit 1
+    fi
+
+# gh ws <command>
+elif [ "$1" != "init" ] && [ "$1" != "list" ] && [ "$1" != "remove" ] && [ "$1" != "rm" ]; then
+    workspace_dir="$HOME/ghq/workspaces"
+    if [ -d "$workspace_dir" ]; then
+        temp_file=$(mktemp)
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                echo "$workspace" >> "$temp_file"
+            fi
+        done 2>/dev/null || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No workspaces found"
+            rm "$temp_file"
+            exit 0
+        fi
+        
+        selected_workspace=$(cat "$temp_file" | fzf --prompt="Select workspace: " || true)
+        rm "$temp_file"
+        
+        if [ -n "$selected_workspace" ]; then
+            exec "$@" "$selected_workspace"
+        fi
+    else
+        echo "No workspaces directory found"
         exit 1
     fi
 
@@ -168,7 +218,10 @@ else
             fi
             
             # Read worktrees into array
-            mapfile -t worktrees < "$temp_file"
+            worktrees=()
+            while IFS= read -r line; do
+                worktrees+=("$line")
+            done < "$temp_file"
             rm "$temp_file"
             
             # Create workspace
