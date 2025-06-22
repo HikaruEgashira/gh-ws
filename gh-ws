@@ -59,6 +59,7 @@ if [ -z "$1" ] || [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
     echo "  gh ws edit          ... Edit workspace file in EDITOR"
     echo "  gh ws remove        ... Remove workspace (interactive selection)"
     echo "  gh ws sync          ... Sync workspace with current git worktree state"
+    echo "  gh ws add           ... Add current directory to selected workspace"
     echo "  gh ws claude        ... Run Claude with current workspace folders or select workspace"
     echo "  gh ws -- <command>  ... Search via fzf and run <command> in the selected workspace directory"
     echo "  gh ws <command>     ... Search via fzf and run <command> with selected workspace as argument"
@@ -376,13 +377,100 @@ elif [ "$1" == "sync" ]; then
         exit 1
     fi
 
+# gh ws add
+elif [ "$1" == "add" ]; then
+    workspace_dir="$HOME/ghq/workspaces"
+    current_path=$(pwd)
+    
+    if [ -d "$workspace_dir" ]; then
+        temp_file=$(mktemp)
+        for workspace in "$workspace_dir"/*.code-workspace; do
+            if [ -f "$workspace" ]; then
+                echo "$workspace" >> "$temp_file"
+            fi
+        done 2>/dev/null || true
+        
+        if [ ! -s "$temp_file" ]; then
+            echo "No workspaces found"
+            rm "$temp_file"
+            exit 0
+        fi
+        
+        selected_workspace=$(cat "$temp_file" | fzf --prompt="Select workspace to add current directory to: " || true)
+        rm "$temp_file"
+        
+        if [ -n "$selected_workspace" ]; then
+            echo "Adding current directory to workspace: $(basename "$selected_workspace" .code-workspace)"
+            echo "Path: $current_path"
+            
+            # Read existing workspace content
+            existing_content=$(cat "$selected_workspace")
+            
+            # Parse existing folders
+            existing_folders=$(echo "$existing_content" | grep -o '"path":"[^"]*"' | cut -d'"' -f4)
+            
+            # Check if path already exists
+            path_exists=false
+            while IFS= read -r folder; do
+                if [ "$folder" == "$current_path" ]; then
+                    path_exists=true
+                    break
+                fi
+            done <<< "$existing_folders"
+            
+            if [ "$path_exists" = true ]; then
+                echo "Path already exists in workspace"
+                exit 0
+            fi
+            
+            # Create new workspace JSON with added path
+            workspace_json='{"folders":['
+            first=true
+            
+            # Add existing folders
+            while IFS= read -r folder; do
+                if [ -n "$folder" ]; then
+                    if [ "$first" = true ]; then
+                        first=false
+                    else
+                        workspace_json+=','
+                    fi
+                    workspace_json+="{\"path\":\"$folder\"}"
+                fi
+            done <<< "$existing_folders"
+            
+            # Add new path
+            if [ "$first" = false ]; then
+                workspace_json+=','
+            fi
+            workspace_json+="{\"path\":\"$current_path\"}"
+            
+            workspace_json+=']}'
+            
+            # Save updated workspace
+            echo "$workspace_json" > "$selected_workspace"
+            
+            echo "Path added successfully!"
+            echo "Updated folders:"
+            while IFS= read -r folder; do
+                if [ -n "$folder" ]; then
+                    echo "  - $folder"
+                fi
+            done <<< "$existing_folders"
+            echo "  - $current_path (new)"
+        fi
+    else
+        echo "No workspaces directory found"
+        exit 1
+    fi
+
 # gh ws claude
 elif [ "$1" == "claude" ]; then
     shift  # Remove "claude" from arguments
     exec "$(dirname "$0")/gh-ws-claude" "$@"
 
 # gh ws <command>
-elif [ "$1" != "init" ] && [ "$1" != "list" ] && [ "$1" != "remove" ] && [ "$1" != "rm" ] && [ "$1" != "sync" ]; then
+elif [ "$1" != "init" ] && [ "$1" != "list" ] && [ "$1" != "remove" ] && [ "$1" != "rm" ] && [ "$1" != "sync" ] && [ "$1" != "add" ]; then
     workspace_dir="$HOME/ghq/workspaces"
     if [ -d "$workspace_dir" ]; then
         temp_file=$(mktemp)
